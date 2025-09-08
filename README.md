@@ -1,15 +1,15 @@
-# Cerebras Code MCP Server v1.2.3
+# Cerebras Code MCP Server v1.3.0
 
 This MCP server is designed for **planning with Claude Code, Cline, or Cursor** and **making changes with Cerebras** to maximize speed and intelligence while avoiding API limits. Use your preferred AI for planning and strategy, then leverage Cerebras for high-quality code generation.
 
 It will use the Qwen 3 Coder model, and can be embedded in IDEs like Claude Code and Cline, with beta support for Cursor.
 
-## ✨ New in v1.2.2
+## ✨ New in v1.3.0
 
 - **Project Restructure**: Organized project into smaller, more manageable components for DX purposes
 - **Stronger Instruction**: Improved `write` usage count among models
 - **Claude Code - Enhanced Visual Diffs**: Displays changes/edits in a pretty format
-- **Hide User API Key**: For security, doesn't display entered API keys in the terminal
+- **VS Code Support**: Added install/remove support for VS Code
 - **Update Config Wizard for Messy Configs**: Added a removal wizard that helps uninstall
 
 ## 1. Install the NPM Package
