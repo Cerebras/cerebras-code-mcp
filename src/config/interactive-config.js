@@ -3,12 +3,30 @@ import fs from 'fs/promises';
 import path from 'path';
 import { getClineRulesPath, CEREBRAS_MCP_RULES } from './constants.js';
 
+// Input validation functions
+function validateMenuChoice(choice, maxOption) {
+  const num = parseInt(choice);
+  return !isNaN(num) && num >= 1 && num <= maxOption;
+}
+
+function validateApiKey(key) {
+  if (!key || typeof key !== 'string') return false;
+  const trimmed = key.trim();
+  return trimmed.length > 0 && trimmed.length < 500; // Reasonable length limits
+}
+
+function sanitizeForShell(input) {
+  if (!input || typeof input !== 'string') return '';
+  // Remove potentially dangerous characters for shell commands
+  return input.replace(/[;&|`$(){}[\]\\]/g, '');
+}
+
 // Removal/cleanup handler
 async function handleRemoval(question) {
   console.log('\nCerebras MCP Removal/Cleanup');
   console.log('============================\n');
   
-  const removeChoice = await question('What would you like to remove?\n1. Claude Code setup\n2. Cursor setup\n3. Cline setup\n4. All setups (complete cleanup)\nEnter choice (1, 2, 3, or 4): ');
+  const removeChoice = await question('What would you like to remove?\n1. Claude Code setup\n2. Cursor setup\n3. Cline setup\n4. VS Code (Copilot) setup\n5. All setups (complete cleanup)\nEnter choice (1, 2, 3, 4, or 5): ');
   
   switch (removeChoice) {
     case '1':
@@ -21,6 +39,9 @@ async function handleRemoval(question) {
       await removeClineSetup();
       break;
     case '4':
+      await removeVSCodeSetup();
+      break;
+    case '5':
       await removeAllSetups();
       break;
     default:
@@ -213,14 +234,78 @@ async function removeClineSetup() {
   }
 }
 
+// Remove VS Code setup
+async function removeVSCodeSetup() {
+  try {
+    console.log('\n🧹 Removing VS Code setup...');
+    
+     const homeDirectory = process.platform === 'win32' ? process.env.USERPROFILE : process.env.HOME;
+     let vscodeMcpPath, vscodeInstructionsPath;
+     if (process.platform === 'win32') {
+       vscodeMcpPath = path.join(process.env.APPDATA, 'Code', 'User', 'mcp.json');
+       vscodeInstructionsPath = path.join(process.env.APPDATA, 'Code', 'User', 'instructions', 'cerebras-mcp.instructions.md');
+     } else if (process.platform === 'darwin') {
+       vscodeMcpPath = path.join(homeDirectory, 'Library', 'Application Support', 'Code', 'User', 'mcp.json');
+       vscodeInstructionsPath = path.join(homeDirectory, 'Library', 'Application Support', 'Code', 'User', 'instructions', 'cerebras-mcp.instructions.md');
+     } else {
+       vscodeMcpPath = path.join(homeDirectory, '.config', 'Code', 'User', 'mcp.json');
+       vscodeInstructionsPath = path.join(homeDirectory, '.config', 'Code', 'User', 'instructions', 'cerebras-mcp.instructions.md');
+     }
+     
+     // Note: We don't create universal instructions files for VS Code since there's no official support
+     
+     // Remove from VS Code MCP configuration
+     try {
+       const existingContent = await fs.readFile(vscodeMcpPath, 'utf-8');
+       const existingMcpConfig = JSON.parse(existingContent);
+       
+       let hasChanges = false;
+       
+       // Remove cerebras-mcp server
+       if (existingMcpConfig.servers && existingMcpConfig.servers['cerebras-mcp']) {
+         delete existingMcpConfig.servers['cerebras-mcp'];
+         hasChanges = true;
+       }
+       
+       // Also remove old cerebras-code server if it exists
+       if (existingMcpConfig.servers && existingMcpConfig.servers['cerebras-code']) {
+         delete existingMcpConfig.servers['cerebras-code'];
+         hasChanges = true;
+       }
+       
+       if (hasChanges) {
+         // If no other MCP servers, remove the whole file
+         if (existingMcpConfig.servers && Object.keys(existingMcpConfig.servers).length === 0) {
+           await fs.unlink(vscodeMcpPath);
+           console.log('✅ Removed empty VS Code MCP configuration file');
+         } else {
+           await fs.writeFile(vscodeMcpPath, JSON.stringify(existingMcpConfig, null, 2), 'utf-8');
+           console.log('✅ Removed cerebras-mcp and old cerebras-code from VS Code MCP config');
+         }
+       } else {
+         console.log('ℹ️  No cerebras servers found in VS Code MCP config');
+       }
+     } catch (error) {
+       console.log('ℹ️  No VS Code MCP configuration found (already removed or never configured)');
+     }
+     
+     // Note: We don't create workspace instructions for VS Code since there's no official support
+    
+    console.log('\n✅ VS Code cleanup completed!');
+  } catch (error) {
+    console.log(`❌ Failed to remove VS Code setup: ${error.message}`);
+  }
+}
+
 // Remove all setups
 async function removeAllSetups() {
   console.log('\n🧹 Removing ALL cerebras-mcp setups...');
-  console.log('This will clean up Claude Code, Cursor, and Cline configurations.\n');
+  console.log('This will clean up Claude Code, Cursor, Cline, and VS Code configurations.\n');
   
   await removeClaudeSetup();
   await removeCursorSetup();
   await removeClineSetup();
+  await removeVSCodeSetup();
   
   console.log('\n🎉 Complete cleanup finished!');
   console.log('All cerebras-mcp configurations have been removed from all IDEs.');
@@ -319,7 +404,12 @@ export async function interactiveConfig() {
     console.log('=====================================\n');
 
     // Ask for service
-    const service = await question('Which service are you using?\n1. Claude Code\n2. Cursor\n3. Cline\nEnter choice (1, 2, or 3): ');
+    const service = await question('Which service are you using?\n1. Claude Code\n2. Cursor\n3. Cline\n4. VS Code\nEnter choice (1, 2, 3, or 4): ');
+    
+    if (!validateMenuChoice(service, 4)) {
+      console.log('❌ Invalid choice. Please enter 1, 2, 3, or 4.');
+      return;
+    }
     
     let serviceName = '';
     if (service === '1') {
@@ -328,6 +418,8 @@ export async function interactiveConfig() {
       serviceName = 'Cursor';
     } else if (service === '3') {
       serviceName = 'Cline';
+    } else if (service === '4') {
+      serviceName = 'VS Code';
     } else {
       console.log('❌ Invalid choice. Using default: Claude Code');
       serviceName = 'Claude Code';
@@ -355,6 +447,27 @@ export async function interactiveConfig() {
       console.log('OpenRouter API key saved\n');
     } else {
       console.log('Skipping OpenRouter API key\n');
+    }
+    
+    // Validate API keys
+    if (!cerebrasKey.trim() && !openRouterKey.trim()) {
+      console.log('❌ At least one API key is required. Please run the setup again.');
+      return;
+    }
+    
+    if (cerebrasKey.trim() && !validateApiKey(cerebrasKey)) {
+      console.log('❌ Invalid Cerebras API key format. Please check and try again.');
+      return;
+    }
+    
+    if (openRouterKey.trim() && !validateApiKey(openRouterKey)) {
+      console.log('❌ Invalid OpenRouter API key format. Please check and try again.');
+      return;
+    }
+    
+    if (cerebrasKey.trim() && !cerebrasKey.trim().startsWith('csk-')) {
+      console.log('⚠️  Warning: Cerebras API keys typically start with "csk-"');
+      console.log('   Please verify your API key is correct.');
     }
     
     if (serviceName === 'Cursor') {
@@ -503,6 +616,82 @@ export async function interactiveConfig() {
         
       } catch (error) {
         console.log(`Failed to setup Cline: ${error.message}`);
+        console.log('Please check the error and try again.');
+      }
+      
+    } else if (serviceName === 'VS Code') {
+      // Execute VS Code setup
+      try {
+        console.log('\n🔧 Setting up VS Code integration...');
+        
+         // Create VS Code MCP configuration using native VS Code MCP support
+         const homeDirectory = process.platform === 'win32' ? process.env.USERPROFILE : process.env.HOME;
+         let vscodeMcpPath;
+         if (process.platform === 'win32') {
+           vscodeMcpPath = path.join(process.env.APPDATA, 'Code', 'User', 'mcp.json');
+         } else if (process.platform === 'darwin') {
+           vscodeMcpPath = path.join(homeDirectory, 'Library', 'Application Support', 'Code', 'User', 'mcp.json');
+         } else {
+           vscodeMcpPath = path.join(homeDirectory, '.config', 'Code', 'User', 'mcp.json');
+         }
+         
+         // Ensure directory exists
+         await fs.mkdir(path.dirname(vscodeMcpPath), { recursive: true });
+         
+         // Read existing MCP configuration or create new one
+         let existingMcpConfig = { servers: {} };
+         try {
+           const existingContent = await fs.readFile(vscodeMcpPath, 'utf-8');
+           existingMcpConfig = JSON.parse(existingContent);
+           if (!existingMcpConfig.servers) {
+             existingMcpConfig.servers = {};
+           }
+         } catch (error) {
+           // File doesn't exist or is invalid, start with empty config
+           existingMcpConfig = { servers: {} };
+         }
+         
+         // Clean up old cerebras-code server if it exists
+         if (existingMcpConfig.servers['cerebras-code']) {
+           console.log('🧹 Removing old cerebras-code MCP server configuration...');
+           delete existingMcpConfig.servers['cerebras-code'];
+           console.log('✅ Old cerebras-code configuration removed');
+         }
+         
+         // Build environment variables
+         const env = {};
+         if (cerebrasKey.trim()) {
+           env.CEREBRAS_API_KEY = cerebrasKey.trim();
+         }
+         if (openRouterKey.trim()) {
+           env.OPENROUTER_API_KEY = openRouterKey.trim();
+         }
+         // Add IDE identification
+         env.CEREBRAS_MCP_IDE = "vscode";
+         
+         // Add cerebras-mcp server using VS Code's native MCP format
+         existingMcpConfig.servers['cerebras-mcp'] = {
+           command: "cerebras-mcp",
+           env: env
+         };
+         
+         // Write the updated MCP configuration
+         await fs.writeFile(vscodeMcpPath, JSON.stringify(existingMcpConfig, null, 2), 'utf-8');
+        
+        // Note: VS Code doesn't have a documented universal instructions system like Claude/Cursor
+        // We'll focus only on the MCP server configuration which is officially supported
+        
+         console.log('\n✅ VS Code MCP server configured successfully!');
+         console.log(`MCP config updated at: ${vscodeMcpPath}`);
+         console.log('\n📝 The MCP server has been automatically configured.');
+         console.log('🔄 Please restart VS Code to use the new MCP server.');
+         console.log('\n💡 To enable MCP tools in Copilot:');
+         console.log('   1. Open Copilot chat interface');
+         console.log('   2. Click the "Tools" button');
+         console.log('   3. Enable cerebras-mcp tools');
+        
+      } catch (error) {
+        console.log(`Failed to setup VS Code: ${error.message}`);
         console.log('Please check the error and try again.');
       }
       

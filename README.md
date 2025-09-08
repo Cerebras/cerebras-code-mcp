@@ -26,7 +26,7 @@ Visit [OpenRouter](https://openrouter.ai/) and get a key to use as a fallback pr
 You can set this key in your MCP settings under OPENROUTER_API_KEY, and it will trigger automatically if anything goes wrong with calling Cerebras.
 
 
-## 3. Run the Setup Wizard for Claude Code / Cursor / Cline
+## 3. Run the Setup Wizard for Claude Code / Cursor / Cline / VS Code (Copilot)
 ```bash
 cerebras-mcp --config
 ```
