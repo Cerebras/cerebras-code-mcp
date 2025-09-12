@@ -26,7 +26,7 @@ async function handleRemoval(question) {
   console.log('\nCerebras MCP Removal/Cleanup');
   console.log('============================\n');
   
-  const removeChoice = await question('What would you like to remove?\n1. Claude Code setup\n2. Cursor setup\n3. Cline setup\n4. VS Code (Copilot) setup\n5. All setups (complete cleanup)\nEnter choice (1, 2, 3, 4, or 5): ');
+  const removeChoice = await question('What would you like to remove?\n1. Claude Code setup\n2. Cursor setup\n3. Cline setup\n4. VS Code (Copilot) setup\n5. Crush (Terminal AI) setup\n6. All setups (complete cleanup)\nEnter choice (1, 2, 3, 4, 5, or 6): ');
   
   switch (removeChoice) {
     case '1':
@@ -42,6 +42,9 @@ async function handleRemoval(question) {
       await removeVSCodeSetup();
       break;
     case '5':
+      await removeCrushSetup();
+      break;
+    case '6':
       await removeAllSetups();
       break;
     default:
@@ -297,15 +300,85 @@ async function removeVSCodeSetup() {
   }
 }
 
+// Remove Crush setup
+async function removeCrushSetup() {
+  try {
+    console.log('\n🧹 Removing Crush setup...');
+    
+    const homeDirectory = process.platform === 'win32' ? process.env.USERPROFILE : process.env.HOME;
+    let crushConfigPath;
+    
+    if (process.platform === 'win32') {
+      crushConfigPath = path.join(homeDirectory, 'AppData', 'Local', 'crush', 'crush.json');
+    } else {
+      crushConfigPath = path.join(homeDirectory, '.config', 'crush', 'crush.json');
+    }
+    
+    // Remove from Crush MCP configuration
+    try {
+      const existingContent = await fs.readFile(crushConfigPath, 'utf-8');
+      const existingConfig = JSON.parse(existingContent);
+      
+      let removed = false;
+      
+      // Remove cerebras-mcp and old cerebras-code servers
+      if (existingConfig.mcp) {
+        if (existingConfig.mcp['cerebras-mcp']) {
+          delete existingConfig.mcp['cerebras-mcp'];
+          removed = true;
+        }
+        if (existingConfig.mcp['cerebras-code']) {
+          delete existingConfig.mcp['cerebras-code'];
+          removed = true;
+        }
+        
+        // If no more MCP servers, remove the mcp section
+        if (Object.keys(existingConfig.mcp).length === 0) {
+          delete existingConfig.mcp;
+        }
+      }
+      
+      // Remove tool permissions if they were set for cerebras
+      if (existingConfig.permissions && existingConfig.permissions.allowed_tools) {
+        // Only remove if it was set to wildcard (our configuration)
+        if (JSON.stringify(existingConfig.permissions.allowed_tools) === JSON.stringify(['*'])) {
+          delete existingConfig.permissions;
+          removed = true;
+        }
+      }
+      
+      if (removed) {
+        // If config is now empty, remove the file
+        if (Object.keys(existingConfig).length === 0) {
+          await fs.unlink(crushConfigPath);
+          console.log('✅ Removed empty Crush configuration file');
+        } else {
+          await fs.writeFile(crushConfigPath, JSON.stringify(existingConfig, null, 2), 'utf-8');
+          console.log('✅ Removed cerebras-mcp and old cerebras-code from Crush configuration');
+        }
+      } else {
+        console.log('ℹ️  No cerebras servers found in Crush configuration');
+      }
+    } catch (error) {
+      console.log('ℹ️  No Crush configuration found (already removed or never configured)');
+    }
+    
+    console.log('\n✅ Crush cleanup completed!');
+  } catch (error) {
+    console.log(`❌ Failed to remove Crush setup: ${error.message}`);
+  }
+}
+
 // Remove all setups
 async function removeAllSetups() {
   console.log('\n🧹 Removing ALL cerebras-mcp setups...');
-  console.log('This will clean up Claude Code, Cursor, Cline, and VS Code configurations.\n');
+  console.log('This will clean up Claude Code, Cursor, Cline, VS Code, and Crush configurations.\n');
   
   await removeClaudeSetup();
   await removeCursorSetup();
   await removeClineSetup();
   await removeVSCodeSetup();
+  await removeCrushSetup();
   
   console.log('\n🎉 Complete cleanup finished!');
   console.log('All cerebras-mcp configurations have been removed from all IDEs.');
@@ -404,10 +477,10 @@ export async function interactiveConfig() {
     console.log('=====================================\n');
 
     // Ask for service
-    const service = await question('Which service are you using?\n1. Claude Code\n2. Cursor\n3. Cline\n4. VS Code\nEnter choice (1, 2, 3, or 4): ');
+    const service = await question('Which service are you using?\n1. Claude Code\n2. Cursor\n3. Cline\n4. VS Code\n5. Crush (Terminal AI)\nEnter choice (1, 2, 3, 4, or 5): ');
     
-    if (!validateMenuChoice(service, 4)) {
-      console.log('❌ Invalid choice. Please enter 1, 2, 3, or 4.');
+    if (!validateMenuChoice(service, 5)) {
+      console.log('❌ Invalid choice. Please enter 1, 2, 3, 4, or 5.');
       return;
     }
     
@@ -420,6 +493,8 @@ export async function interactiveConfig() {
       serviceName = 'Cline';
     } else if (service === '4') {
       serviceName = 'VS Code';
+    } else if (service === '5') {
+      serviceName = 'Crush';
     } else {
       console.log('❌ Invalid choice. Using default: Claude Code');
       serviceName = 'Claude Code';
@@ -692,6 +767,87 @@ export async function interactiveConfig() {
         
       } catch (error) {
         console.log(`Failed to setup VS Code: ${error.message}`);
+        console.log('Please check the error and try again.');
+      }
+      
+    } else if (serviceName === 'Crush') {
+      // Execute Crush setup
+      try {
+        const homeDirectory = process.platform === 'win32' ? process.env.USERPROFILE : process.env.HOME;
+        let crushConfigPath;
+        
+        if (process.platform === 'win32') {
+          crushConfigPath = path.join(homeDirectory, 'AppData', 'Local', 'crush', 'crush.json');
+        } else {
+          crushConfigPath = path.join(homeDirectory, '.config', 'crush', 'crush.json');
+        }
+        
+        // Ensure directory exists
+        const crushConfigDir = path.dirname(crushConfigPath);
+        await fs.mkdir(crushConfigDir, { recursive: true });
+        
+        // Read existing config or create new one
+        let existingConfig = {};
+        try {
+          const existingContent = await fs.readFile(crushConfigPath, 'utf-8');
+          existingConfig = JSON.parse(existingContent);
+        } catch (error) {
+          // File doesn't exist, start with empty config
+          existingConfig = {
+            "$schema": "https://charm.land/crush.json"
+          };
+        }
+        
+        // Ensure mcp section exists
+        if (!existingConfig.mcp) {
+          existingConfig.mcp = {};
+        }
+        
+        // Remove old cerebras-code server if it exists
+        if (existingConfig.mcp['cerebras-code']) {
+          delete existingConfig.mcp['cerebras-code'];
+        }
+        
+        // Prepare environment variables
+        const env = {};
+        if (cerebrasKey.trim()) {
+          env.CEREBRAS_API_KEY = cerebrasKey.trim();
+        }
+        if (openRouterKey.trim()) {
+          env.OPENROUTER_API_KEY = openRouterKey.trim();
+        }
+        // Add IDE identification
+        env.CEREBRAS_MCP_IDE = 'crush';
+        
+        // Add cerebras-mcp server configuration
+        existingConfig.mcp['cerebras-mcp'] = {
+          type: "stdio",
+          command: "cerebras-mcp",
+          env: env
+        };
+        
+        // Add permissions to allow all tools without prompting
+        existingConfig.permissions = {
+          allowed_tools: ["*"]
+        };
+        
+        // Write the updated config
+        await fs.writeFile(crushConfigPath, JSON.stringify(existingConfig, null, 2), 'utf-8');
+        
+        console.log('\n✅ Crush MCP server configured successfully!');
+        console.log(`Config updated at: ${crushConfigPath}`);
+        console.log('\n📝 The MCP server has been automatically configured with:');
+        console.log('   • cerebras-mcp server with stdio transport');
+        console.log('   • All MCP tools pre-approved (no prompting)');
+        console.log('   • Environment variables for API keys');
+        console.log('\n🔄 Please restart Crush to use the new MCP server.');
+        console.log('\n💡 Usage in Crush:');
+        console.log('   • The write tool will be available automatically');
+        console.log('   • Ask Crush to create or edit files');
+        console.log('   • Crush will use the MCP write tool for all code operations');
+        
+      } catch (error) {
+        console.log(`Failed to setup Crush: ${error.message}`);
         console.log('Please check the error and try again.');
       }
       
