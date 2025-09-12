@@ -9,7 +9,7 @@ The Cerebras MCP project takes security seriously. If you discover a security vu
 To report a security issue, please:
 
 1. **Do NOT** create a public GitHub issue
-2. Email us at: **security@cerebras.ai**
+2. Email us at: **security@cerebras.net**
 3. Include the following information:
    - Description of the vulnerability
    - Steps to reproduce the issue
