@@ -1,0 +1,26 @@
+# Global code ownership for cerebras-code-mcp repository
+# All files require review from maintainers
+
+# Default owners for everything in the repository
+* @kevint-cerebras
+
+# Configuration and setup files
+/src/config/ @kevint-cerebras
+/package.json @kevint-cerebras
+/package-lock.json @kevint-cerebras
+
+# Security and community files
+/SECURITY.md @kevint-cerebras
+/CONTRIBUTING.md @kevint-cerebras
+/SUPPORT.md @kevint-cerebras
+/.github/ @kevint-cerebras
+
+# Core MCP server functionality
+/src/server/ @kevint-cerebras
+/src/index.js @kevint-cerebras
+
+# API integrations
+/src/api/ @kevint-cerebras
+
+# Documentation
+/README.md @kevint-cerebras
