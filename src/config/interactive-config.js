@@ -347,6 +347,22 @@ async function removeCrushSetup() {
         }
       }
       
+      // Remove disabled_tools if they were set for cerebras (our specific list)
+      if (existingConfig.options && existingConfig.options.disabled_tools) {
+        const disabledTools = existingConfig.options.disabled_tools;
+        const cerebrasList = ["edit", "write", "multiedit", "create_file", "file_create", "file_write", "file_edit"];
+        
+        if (Array.isArray(disabledTools) && 
+            cerebrasList.some(tool => disabledTools.includes(tool))) {
+          delete existingConfig.options.disabled_tools;
+          // If options is now empty, remove it
+          if (Object.keys(existingConfig.options).length === 0) {
+            delete existingConfig.options;
+          }
+          removed = true;
+        }
+      }
+      
       if (removed) {
         // If config is now empty, remove the file
         if (Object.keys(existingConfig).length === 0) {
@@ -354,7 +370,7 @@ async function removeCrushSetup() {
           console.log('✅ Removed empty Crush configuration file');
         } else {
           await fs.writeFile(crushConfigPath, JSON.stringify(existingConfig, null, 2), 'utf-8');
-          console.log('✅ Removed cerebras-mcp and old cerebras-code from Crush configuration');
+          console.log('✅ Removed cerebras-mcp, tool permissions, and disabled_tools from Crush configuration');
         }
       } else {
         console.log('ℹ️  No cerebras servers found in Crush configuration');
@@ -831,6 +847,20 @@ export async function interactiveConfig() {
           allowed_tools: ["*"]
         };
         
+        // Disable Crush's internal edit/write tools to force MCP tool usage
+        if (!existingConfig.options) {
+          existingConfig.options = {};
+        }
+        existingConfig.options.disabled_tools = [
+          "edit",
+          "write", 
+          "multiedit",
+          "create_file",
+          "file_create",
+          "file_write",
+          "file_edit"
+        ];
+        
         // Write the updated config
         await fs.writeFile(crushConfigPath, JSON.stringify(existingConfig, null, 2), 'utf-8');
         
@@ -839,6 +869,7 @@ export async function interactiveConfig() {
         console.log('\n📝 The MCP server has been automatically configured with:');
         console.log('   • cerebras-mcp server with stdio transport');
         console.log('   • All MCP tools pre-approved (no prompting)');
+        console.log('   • Internal file tools DISABLED (edit, write, multiedit, create_file, etc.)');
         console.log('   • Environment variables for API keys');
         console.log('\n🔄 Please restart Crush to use the new MCP server.');
         console.log('\n💡 Usage in Crush:');

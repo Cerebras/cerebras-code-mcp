@@ -39,15 +39,15 @@ function getIDEFormatting() {
           diffStyle: 'minimal'     // Very minimal diff format
         };
 
-    // case 'vscode':
-    //   return {
-    //     useColors: false,        // VS Code has its own color scheme
-    //     useLineNumbers: false,   // Keep it minimal
-    //     useEmojis: true,         // Emojis are supported
-    //     maxPreviewLines: 25,     // Even shorter for VS Code
-    //     showSummary: true,       // Summary is useful
-    //     diffStyle: 'minimal'     // Very minimal diff format
-    //   };
+    case 'crush':
+      return {
+        useColors: false,        // NO ANSI formatting for Crush
+        useLineNumbers: false,   // Clean terminal output
+        useEmojis: false,        // NO emojis for Crush
+        maxPreviewLines: 20,     // Shorter previews for terminal
+        showSummary: true,       // Brief summary is helpful
+        diffStyle: 'minimal'     // Minimal diff format
+      };
     
     case 'claude':
     default:
